@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "composite": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["./tsup.config.ts"]
+}
