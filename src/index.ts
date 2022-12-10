@@ -75,6 +75,11 @@ export interface KeyStrokeOption {
    * 在组件不激活时是否仍然监听键盘事件
    */
   listenOnkeepAlive?: boolean
+  /**
+   * 用户自定义的键盘事件控制值。如果传入该值，返回结果中的enable与这个值完全一致
+   * - 组件切换激活状态时不会对该值进行修改
+   */
+  customEnable?: Ref<boolean>
 }
 
 /**
@@ -90,6 +95,8 @@ interface KeyStrokeResult {
   enable: Ref<boolean>
   /** 实例作用域按键事件控制值 */
   enableInstance: Ref<boolean>
+  /** 注销键盘监听事件 */
+  clearup: () => void
 }
 
 /**
@@ -149,6 +156,24 @@ interface KeyStrokeResult {
  * }, {
  *   target: document.body
  * })
+ *
+ * // 组件在销毁时会自动注销键盘监听事件，如果需要手动注销，可以调用clearup方法
+ * const { enable, clearup } = useKeyStroke('Control+s', (event) => {
+ *  console.log(event)
+ * })
+ *
+ * clearup() // 手动注销
+ *
+ * // 传入一个已存在的响应式变量控制键盘监听事件
+ * const customEnable = ref(true)
+ * const { enable } = useKeyStroke('Control+s', (event) => {
+ *   console.log(event)
+ * }, {
+ *   customEnable
+ * })
+ * enable === customEnable // true
+ *
+ *
  * ```
  *
  * @returns enable：当前按键事件控制值 enableInstance：实例作用域按键事件控制值
@@ -173,7 +198,15 @@ export function useKeyStroke(
     instance.__utk_enabled = ref(true)
   }
 
-  const enable = ref(true)
+  let enable: Ref<boolean> & { __is_sustom_enabled?: boolean }
+  if (option.customEnable) {
+    enable = option.customEnable
+    enable.__is_sustom_enabled = true
+  } else {
+    enable = ref(true)
+  }
+
+  const enableActivated = ref(true)
   const enableInstance = instance.__utk_enabled
 
   const { target, eventType, timeout, listenOnkeepAlive } = option
@@ -211,18 +244,24 @@ export function useKeyStroke(
 
   if (!listenOnkeepAlive) {
     onActivated(() => {
-      enable.value = true
+      enableActivated.value = true
+      if (!enable.__is_sustom_enabled) {
+        enable.value = true
+      }
     })
     onDeactivated(() => {
-      enable.value = false
+      enableActivated.value = false
+      if (!enable.__is_sustom_enabled) {
+        enable.value = false
+      }
     })
   }
 
-  watchEffect(() => {
+  const stopWatchHandle = watchEffect(() => {
     // 执行操作前先删除旧事件
     unregisterEvent()
     // 不使用直接退出
-    if (!enableInstance.value || !enable.value) return
+    if (!enableInstance.value || !enable.value || !enableActivated.value) return
 
     if (typeof handler === 'function') {
       // 处理器为函数，option中的eventType有效
@@ -256,9 +295,15 @@ export function useKeyStroke(
     registerEvent()
   })
 
+  const clearup = () => {
+    stopWatchHandle()
+    unregisterEvent()
+  }
+
   return {
     enable,
     enableInstance,
+    clearup,
   }
 }
 

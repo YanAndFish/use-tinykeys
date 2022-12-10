@@ -1,4 +1,4 @@
-import { createApp, defineComponent, h } from 'vue'
+import { createApp, defineComponent, h, ref } from 'vue'
 import { useKeyStroke } from '../../dist/index'
 
 const App = defineComponent({
@@ -10,6 +10,17 @@ const App = defineComponent({
     const { enableInstance: enableInstance2 } = useKeyStroke('b', (e) =>
       console.log(e)
     )
+    // 测试手动传入enable以及clearup
+    const customEnable = ref(true)
+    const { enable: enable3, clearup } = useKeyStroke(
+      'c',
+      (e) => console.log(e),
+      {
+        customEnable,
+      }
+    )
+
+    console.log('customEnable === enable3', customEnable === enable3)
 
     return () => [
       h('div', [
@@ -40,6 +51,26 @@ const App = defineComponent({
                 enableInstance2.value
             )
           )
+        ),
+        h(
+          'button',
+          {
+            onClick: () => {
+              customEnable.value = !customEnable.value
+            },
+            type: 'button',
+          },
+          h('span', String('客户自定义状态：' + customEnable.value))
+        ),
+        h(
+          'button',
+          {
+            onClick: () => {
+              clearup()
+            },
+            type: 'button',
+          },
+          '清除'
         ),
       ]),
       h('div', []),
